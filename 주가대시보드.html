@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>주가추이 대시보드 (여보)</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root { --up:#d60000; --down:#0051c7; --bg:#f5f6f8; --card:#ffffff; --text:#222; --sub:#777; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:'Malgun Gothic','Apple SD Gothic Neo',sans-serif; background:var(--bg); color:var(--text); padding:24px; }
+  h1 { font-size:22px; margin-bottom:4px; }
+  .updated { color:var(--sub); font-size:13px; margin-bottom:20px; }
+  .cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:14px; margin-bottom:28px; }
+  .card { background:var(--card); border-radius:12px; padding:16px 18px; box-shadow:0 1px 4px rgba(0,0,0,.07); }
+  .card .name { font-weight:bold; font-size:15px; }
+  .card .code { color:var(--sub); font-size:12px; margin-left:4px; }
+  .card .price { font-size:24px; font-weight:bold; margin:8px 0 2px; }
+  .card .chg { font-size:13px; font-weight:bold; }
+  .card .chg.up { color:var(--up); } .card .chg.down { color:var(--down); }
+  .card .meta { font-size:12px; color:var(--sub); margin-top:8px; line-height:1.7; }
+  .card a { display:inline-block; margin-top:8px; font-size:12px; color:#03c75a; text-decoration:none; font-weight:bold; }
+  .panel { background:var(--card); border-radius:12px; padding:20px; box-shadow:0 1px 4px rgba(0,0,0,.07); margin-bottom:24px; }
+  .panel h2 { font-size:16px; margin-bottom:14px; }
+  .small-charts { display:grid; grid-template-columns:repeat(auto-fit,minmax(320px,1fr)); gap:14px; }
+  .small-charts .panel { margin-bottom:0; }
+  .note { font-size:12px; color:var(--sub); margin-top:8px; }
+  canvas { max-height:380px; }
+  .small-charts canvas { max-height:220px; }
+</style>
+</head>
+<body>
+<h1>📈 주가추이 체크 종목 대시보드</h1>
+<div class="updated" id="updated"></div>
+<div class="cards" id="cards"></div>
+
+<div class="panel">
+  <h2>주가추이 비교 — 2025년 6월부터 (기준일 = 100 상대수익률)</h2>
+  <canvas id="mainChart"></canvas>
+  <div class="note">주간 종가 기준 (출처: Yahoo Finance / 카드 또는 차트를 클릭하면 종목별 상세 페이지로 이동)</div>
+</div>
+
+<h2 style="font-size:16px;margin-bottom:12px;">종목별 주가추이 — 2025년 6월부터 (원)</h2>
+<div class="small-charts" id="smallCharts"></div>
+
+<!--DATA_START-->
+<script>
+window.DASH_DATA = {
+  updated: "2026-06-16 (화)",
+  firstDate: "2023-06-12",
+  lastDate: "2026-06-15",
+  n: 159,
+  stocks: {
+    "005930": { name:"삼성전자", market:"KOSPI", file:"종목_005930_삼성전자.html", price:337000, prev:322500, h52:370000, l52:56900, vol:21500067,
+      closes:[71800,71600,72200,69900,73400,70300,70600,68300,67500,66300,67100,71000,70300,72000,68800,68400,66000,68000,68800,67300,69600,70500,72500,71700,72000,72600,73300,75900,78500,76600,73100,74700,73400,75200,74100,72800,72900,73400,73300,72300,78900,82400,84500,83700,77600,76700,77600,79200,77400,75900,73500,77300,79600,80000,81500,87100,84400,84400,80900,79600,74700,80200,77700,74300,68900,64400,63000,64200,60600,59300,59200,55900,58300,57000,53500,56000,54200,54100,56100,53000,53700,54400,55300,53700,53700,52400,53700,56000,58200,54500,53700,54700,61700,60200,56100,55200,55300,55700,54300,54800,56800,54200,56200,59100,58300,59500,60800,63300,62600,67100,65900,68900,71800,71600,71400,69700,69500,75400,80300,83300,89750,94400,97900,98800,107500,97900,97200,94800,100500,108400,108900,106300,117000,128500,139000,148900,152100,160500,158600,181200,190100,216500,188200,183500,199400,180100,186200,206000,216000,219500,220500,268500,270500,292500,317000,329000,322500,337000,337000] },
+    "000660": { name:"SK하이닉스", market:"KOSPI", file:"종목_000660_SK하이닉스.html", price:2288000, prev:2150000, h52:2407000, l52:238000, vol:3872910,
+      closes:[118900,113600,115200,111800,118000,115100,128000,120100,115300,117200,116500,120000,113700,122400,117300,114700,120400,124700,126200,119100,125800,130500,129900,128000,132600,127500,140000,140600,141500,137500,134100,141300,136000,134900,142800,146800,161400,156200,171900,161200,169800,183000,182800,187400,173300,177800,173200,179900,189900,198600,189200,207500,221000,234000,236500,236000,233000,209500,191800,173200,171500,199700,185500,173700,156400,162800,157100,183800,174100,186000,187300,201000,182200,200500,178200,176700,159900,167100,175500,168500,174500,181900,203500,214500,221000,199200,203000,210000,209500,190200,192400,204500,215500,199300,182200,180800,175000,184400,186000,190100,204500,200000,204500,224500,235500,257000,284000,270500,294500,269000,266000,258000,256500,276500,251000,269000,273500,328500,355500,336500,395500,428000,465500,510000,559000,580000,560000,521000,530000,544000,571000,547000,599000,677000,744000,756000,767000,909000,839000,880000,949000,1061000,924000,910000,1007000,933000,876000,1027000,1128000,1222000,1286000,1686000,1819000,1941000,2333000,2070000,2150000,2288000,2288000] },
+    "011200": { name:"HMM", market:"KOSPI", file:"종목_011200_HMM.html", price:21300, prev:20050, h52:26250, l52:18000, vol:3112754,
+      closes:[19250,18570,18850,18500,19400,19100,17610,17940,17600,17560,17000,16600,16810,16830,16580,16260,15430,14390,14060,14810,15030,16550,15500,15670,15870,15750,15370,20200,19580,20550,20650,19220,19680,19660,18380,17830,19060,18270,16950,15960,15560,15720,15380,15380,15500,15080,15310,18340,16180,16780,18000,19500,18050,19140,19630,19370,17560,17250,17090,18210,17370,17940,17630,16970,16270,16860,17630,18860,17100,16870,17180,16830,17070,17050,18240,18590,17960,18000,18800,18400,17530,18370,18900,19430,18640,19040,18580,18320,18670,19590,21650,20700,19840,19670,19600,19320,19350,18820,18250,18160,22950,22200,21300,21600,24200,23000,22400,24300,25450,25000,24600,23000,23000,22100,22600,22100,22950,24300,23150,20550,20400,19870,20800,20550,20550,19820,19420,19150,19140,20550,20750,20550,20300,20200,20000,20000,20350,20000,20100,21450,23150,21350,21150,21050,21250,19660,20050,21650,21100,21100,20500,20600,19890,20500,19560,19450,20050,21300,21300] },
+    "137400": { name:"피엔티", market:"KOSDAQ", file:"종목_137400_피엔티.html", price:44000, prev:41650, h52:62000, l52:30150, vol:127847,
+      closes:[57200,54200,54000,56500,67700,78200,74500,74700,71300,66900,65400,70800,69600,70000,63900,61600,60400,63100,56400,50900,52200,51700,47700,50800,51200,49050,51000,50200,50400,48400,44400,41400,39250,36750,38150,40500,42300,40300,44650,43100,44000,41550,39200,39400,38500,38950,41000,43450,44950,46150,66100,78000,80000,76700,67200,62300,58500,54100,52700,52500,56200,56600,54200,56400,47700,49150,49450,58300,56600,58100,52400,50800,51500,50200,41150,46400,43400,41700,41850,39300,37350,39450,39500,40750,38800,40550,39450,41600,48600,44600,44100,43700,45800,41100,40400,38500,40350,41650,40550,39700,36650,31350,31450,32850,31250,31550,31150,31900,32000,32700,34050,33600,35800,38600,40900,38450,38100,38050,37750,35100,35250,34450,41050,46700,43250,41550,42700,38600,41100,41500,42100,37950,39350,36600,35700,37150,43950,52900,48100,51200,53300,54700,50800,47900,47900,50700,47150,49550,54000,58300,56000,56600,47300,47700,46450,40750,41650,44000,44000] },
+    "066590": { name:"스모트로닉", market:"KOSDAQ", file:"종목_066590_스모트로닉.html", price:2175, prev:2160, h52:4200, l52:1959, vol:89393,
+      closes:[3380,3080,3180,3250,3280,3090,2895,2820,2935,2990,2850,2935,2800,2800,2740,2560,2515,2500,2365,2270,2340,2275,2440,2650,2615,2595,2610,2570,2545,2755,2775,2805,2855,2875,2995,3090,3055,3140,3150,3040,3115,3035,2915,2885,2755,2830,2970,2940,2980,2980,2830,2865,3010,2990,3270,3220,3355,3265,3300,2970,2985,2990,2990,2965,3030,3080,3065,3135,3010,3015,3000,3010,3185,3050,3000,2980,2995,2970,3015,3015,2995,3015,3030,3000,3045,3000,3010,3005,3045,3005,3000,3015,3025,2995,3010,3000,3060,3060,3100,3125,3010,3150,3175,3150,3160,3315,3430,3950,3500,3340,3090,3040,2960,2950,2925,2845,2945,2975,2985,2865,2875,2860,2810,2910,2905,2710,2680,2555,2520,2555,2515,2505,2340,2465,2905,3500,3595,3155,3020,3010,3080,3115,2830,2750,2900,2805,2605,2570,2655,2635,2760,2635,2440,2530,2220,2140,2160,2175,2175] }
+  }
+};
+</script>
+<!--DATA_END-->
+
+<script>
+const D = window.DASH_DATA;
+const COLORS = { "005930":"#1f77b4", "000660":"#d62728", "011200":"#2ca02c", "137400":"#9467bd", "066590":"#ff7f0e" };
+
+// 주간 날짜 배열 재구성: firstDate부터 7일 간격 (n-1)개 + 마지막은 lastDate
+function buildDates() {
+  const dates = [];
+  const d0 = new Date(D.firstDate + "T00:00:00");
+  for (let i = 0; i < D.n - 1; i++) {
+    const d = new Date(d0.getTime() + i * 7 * 86400000);
+    dates.push(d.toISOString().slice(0, 10));
+  }
+  dates.push(D.lastDate);
+  return dates;
+}
+const dates = buildDates();
+
+document.getElementById("updated").textContent =
+  "최종 업데이트: " + D.updated + " · 주간 종가 기준 3년 (" + D.firstDate + " ~ " + D.lastDate + ") · 매일 8시·11시·16시 자동 갱신";
+
+// 카드
+const fmt = n => n.toLocaleString("ko-KR");
+const cardsEl = document.getElementById("cards");
+for (const [code, s] of Object.entries(D.stocks)) {
+  const diff = s.price - s.prev;
+  const pct = (diff / s.prev * 100).toFixed(2);
+  const cls = diff >= 0 ? "up" : "down";
+  const arrow = diff > 0 ? "▲" : diff < 0 ? "▼" : "−";
+  cardsEl.insertAdjacentHTML("beforeend", `
+    <div class="card" style="border-top:4px solid ${COLORS[code]};cursor:pointer" onclick="if(event.target.tagName!=='A')location.href='${s.file}'">
+      <span class="name">${s.name}</span><span class="code">${code} · ${s.market}</span>
+      <div class="price">${fmt(s.price)}원</div>
+      <div class="chg ${cls}">${arrow} ${fmt(Math.abs(diff))} (${pct}%) <span style="font-weight:normal;color:var(--sub)">전일 대비</span></div>
+      <div class="meta">52주 최고 ${fmt(s.h52)} / 최저 ${fmt(s.l52)}<br>거래량 ${fmt(s.vol)}</div>
+      <a href="${s.file}">상세 보기 →</a> &nbsp;
+      <a href="https://finance.naver.com/item/main.naver?code=${code}" target="_blank">네이버 금융 →</a>
+    </div>`);
+}
+
+// 메인 비교 차트 (상대수익률, 2025-06부터)
+const CMP_FROM = "2025-06-01";
+let cmpStart = dates.findIndex(d => d >= CMP_FROM);
+if (cmpStart < 0) cmpStart = 0;
+const cmpDates = dates.slice(cmpStart);
+new Chart(document.getElementById("mainChart"), {
+  type: "line",
+  data: {
+    labels: cmpDates,
+    datasets: Object.entries(D.stocks).map(([code, s]) => {
+      const seg = s.closes.slice(cmpStart);
+      const base = seg.find(v => v != null);
+      return { label: s.name, data: seg.map(v => v == null ? null : +(v / base * 100).toFixed(1)),
+               borderColor: COLORS[code], backgroundColor: COLORS[code], borderWidth: 2, pointRadius: 0, tension: .15, spanGaps: true };
+    })
+  },
+  options: {
+    responsive: true, interaction: { mode: "index", intersect: false },
+    plugins: { legend: { position: "top" }, tooltip: { callbacks: { label: c => `${c.dataset.label}: ${c.parsed.y} (기준=100)` } } },
+    scales: { x: { ticks: { maxTicksLimit: 13 } }, y: { title: { display: true, text: "2025-06 기준=100" } } }
+  }
+});
+
+// 종목별 개별 차트
+const sc = document.getElementById("smallCharts");
+for (const [code, s] of Object.entries(D.stocks)) {
+  const id = "c" + code;
+  sc.insertAdjacentHTML("beforeend", `<div class="panel" style="cursor:pointer" onclick="location.href='${s.file}'" title="${s.name} 상세 페이지로 이동"><h2>${s.name} <span style="color:var(--sub);font-size:12px">${code} · 클릭 시 상세 보기</span></h2><canvas id="${id}"></canvas></div>`);
+  new Chart(document.getElementById(id), {
+    type: "line",
+    data: { labels: cmpDates, datasets: [{ data: s.closes.slice(cmpStart), borderColor: COLORS[code], borderWidth: 1.8, pointRadius: 0, tension: .15, spanGaps: true,
+            fill: true, backgroundColor: COLORS[code] + "18" }] },
+    options: { responsive: true, plugins: { legend: { display: false } },
+      scales: { x: { ticks: { maxTicksLimit: 7 } }, y: { ticks: { callback: v => v.toLocaleString("ko-KR") } } },
+      interaction: { mode: "index", intersect: false } }
+  });
+}
+</script>
+<!-- v2 -->
+</body>
+</html>

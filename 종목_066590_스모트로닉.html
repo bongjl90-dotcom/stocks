@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>스모트로닉 (066590) 상세</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root { --up:#d60000; --down:#0051c7; --bg:#f5f6f8; --card:#ffffff; --text:#222; --sub:#777; --accent:#ff7f0e; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:'Malgun Gothic','Apple SD Gothic Neo',sans-serif; background:var(--bg); color:var(--text); padding:24px; }
+  .back { font-size:13px; color:var(--sub); text-decoration:none; }
+  h1 { font-size:22px; margin:10px 0 2px; }
+  h1 .code { font-size:13px; color:var(--sub); font-weight:normal; }
+  .priceline { margin:6px 0 16px; }
+  .priceline .p { font-size:30px; font-weight:bold; }
+  .priceline .chg { font-size:15px; font-weight:bold; margin-left:8px; }
+  .up { color:var(--up); } .down { color:var(--down); }
+  .updated { color:var(--sub); font-size:12px; margin-bottom:14px; }
+  .tabs { display:flex; gap:6px; margin-bottom:16px; flex-wrap:wrap; }
+  .tabs button { padding:9px 18px; border:1px solid #ddd; background:var(--card); border-radius:20px; font-size:14px; cursor:pointer; font-family:inherit; }
+  .tabs button.on { background:var(--accent); color:#fff; border-color:var(--accent); font-weight:bold; }
+  section { display:none; } section.on { display:block; }
+  .panel { background:var(--card); border-radius:12px; padding:20px; box-shadow:0 1px 4px rgba(0,0,0,.07); margin-bottom:16px; }
+  .panel h2 { font-size:15px; margin-bottom:12px; }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  th, td { padding:8px 10px; border-bottom:1px solid #eee; text-align:right; }
+  th:first-child, td:first-child { text-align:left; }
+  thead th { background:#fafafa; color:var(--sub); font-weight:normal; }
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:0 24px; }
+  .kv { display:flex; justify-content:space-between; padding:8px 2px; border-bottom:1px solid #eee; font-size:13px; }
+  .kv .k { color:var(--sub); }
+  .links a { display:block; background:var(--card); border-radius:10px; padding:14px 18px; margin-bottom:10px; text-decoration:none; color:var(--text); box-shadow:0 1px 4px rgba(0,0,0,.07); font-size:14px; }
+  .links a:hover { background:#eef4ff; }
+  .links .d { color:var(--sub); font-size:12px; margin-top:3px; }
+  .note { font-size:12px; color:var(--sub); margin-top:8px; }
+  canvas { max-height:340px; }
+  .strip { display:flex; gap:18px; flex-wrap:wrap; font-size:13px; margin-bottom:14px; }
+  .strip div { background:var(--card); border-radius:8px; padding:8px 14px; box-shadow:0 1px 3px rgba(0,0,0,.06); }
+  .strip b { margin-left:6px; }
+</style>
+</head>
+<body>
+<a class="back" href="주가대시보드.html">← 대시보드로 돌아가기</a>
+<h1 id="title"></h1>
+<div class="priceline"><span class="p" id="price"></span><span class="chg" id="chg"></span></div>
+<div class="updated" id="updated"></div>
+
+<div class="tabs">
+  <button data-t="overview" class="on">종합정보</button>
+  <button data-t="quote">시세</button>
+  <button data-t="fin">재무정보</button>
+  <button data-t="news">뉴스</button>
+  <button data-t="disc">공시사항</button>
+</div>
+
+<section id="tab-overview" class="on">
+  <div class="panel"><h2>주요 투자정보</h2><div class="grid2" id="kvGrid"></div></div>
+  <div class="panel"><h2>주가추이 — 2025년 6월부터 (주간 종가)</h2><canvas id="wkChart"></canvas></div>
+</section>
+
+<section id="tab-quote">
+  <div class="strip" id="strip"></div>
+  <div class="panel"><h2>최근 6개월 일별 종가</h2><canvas id="dChart"></canvas></div>
+  <div class="panel"><h2>일별 시세 (최근 15거래일)</h2>
+    <table><thead><tr><th>날짜</th><th>시가</th><th>고가</th><th>저가</th><th>종가</th><th>등락</th><th>거래량</th></tr></thead><tbody id="tblBody"></tbody></table>
+  </div>
+</section>
+
+<section id="tab-fin">
+  <div class="panel"><h2>연간 실적 (단위: 억원)</h2><canvas id="finChart"></canvas></div>
+  <div class="panel"><h2>연간 재무 요약</h2>
+    <table><thead><tr><th>항목</th><th id="y0"></th><th id="y1"></th><th id="y2"></th><th id="y3"></th></tr></thead><tbody id="finBody"></tbody></table>
+    <div class="note">출처: Yahoo Finance (연결 기준, 매출액·영업이익·순이익 단위 억원 / EPS 단위 원). 회계연도 기준이라 국내 공시와 차이가 있을 수 있음 — 정확한 수치는 공시사항 탭의 DART 참고.</div>
+  </div>
+</section>
+
+<section id="tab-news">
+  <div class="links" id="newsLinks"></div>
+  <div class="note">한국 종목의 개별 뉴스는 야후 파이낸스에서 제한적이라, 가장 정확한 종목 뉴스 페이지로 바로 연결되도록 구성했습니다.</div>
+</section>
+
+<section id="tab-disc">
+  <div class="links" id="discLinks"></div>
+  <div class="note">공시 원문은 금융감독원 전자공시(DART)가 공식 출처입니다.</div>
+</section>
+
+<!--DATA_START-->
+<script>
+window.STOCK = {
+  code:"066590", name:"스모트로닉", market:"KOSDAQ", sym:"066590.KQ", updated:"2026-06-16 (화)",
+  price:2175, h52:4200, l52:1959,
+  sd:{ mcap:84124508160, divY:null, beta:0.979, avgVol:150322, open:2160, prevC:2160, dayH:2200, dayL:2140, shares:38677937, roe:-0.0686, tgt:null, rec:"none", sector:"Consumer Cyclical", industry:"Auto Parts", web:"https://www.woosu.co.kr" },
+  fin:{ years:["2022","2023","2024","2025"],
+        rev:[3253,3480,3542,3686], op:[43,86,95,5], ni:[-175,102,73,-106], eps:[-480,261,189,-275] },
+  dailyDates:["251215","251216","251217","251218","251219","251222","251223","251224","251226","251229","251230","260102","260105","260106","260107","260108","260109","260112","260113","260114","260115","260116","260119","260120","260121","260122","260123","260126","260127","260128","260129","260130","260202","260203","260204","260205","260206","260209","260210","260211","260212","260213","260219","260220","260223","260224","260225","260226","260227","260303","260304","260305","260306","260309","260310","260311","260312","260313","260316","260317","260318","260319","260320","260323","260324","260325","260326","260327","260330","260331","260401","260402","260403","260406","260407","260408","260409","260410","260413","260414","260415","260416","260417","260420","260421","260422","260423","260424","260427","260428","260429","260430","260504","260506","260507","260508","260511","260512","260513","260514","260515","260518","260519","260520","260521","260522","260526","260527","260528","260529","260601","260602","260604","260605","260608","260609","260610","260611","260612","260615"],
+  dailyCloses:[2490,2415,2485,2510,2505,2490,2405,2375,2340,2375,2400,2465,2550,2460,2520,2500,2905,2805,2830,3675,3670,3500,3760,3880,3900,3780,3595,3400,3310,3265,3305,3155,3040,3325,3270,3105,3020,3120,3160,3160,3095,3010,3150,3080,3130,3165,3245,3120,3115,2960,2550,2770,2830,2690,2755,2815,2800,2750,2750,2730,2745,2745,2900,2860,2930,2890,2805,2805,2735,2675,2780,2605,2605,2575,2480,2605,2555,2570,2575,2610,2615,2615,2655,2605,2650,2645,2615,2635,2670,2765,2910,2760,2770,2650,2600,2635,2585,2440,2510,2480,2440,2470,2435,2395,2445,2530,2450,2365,2360,2220,2220,2170,2150,2140,2020,2100,2045,2125,2160,2175],
+  tbl:[["2026-06-15",2160,2200,2140,2175,89393],["2026-06-12",2105,2210,2105,2160,65258],["2026-06-11",2040,2130,1982,2125,87526],["2026-06-10",2085,2090,1988,2045,106100],["2026-06-09",2000,2115,2000,2100,102226],["2026-06-08",2000,2050,1959,2020,144205],["2026-06-05",2105,2145,2070,2140,101296],["2026-06-04",2155,2215,2100,2150,92075],["2026-06-02",2210,2210,2050,2170,216243],["2026-06-01",2220,2275,2100,2220,254175],["2026-05-29",2340,2365,2200,2220,197449],["2026-05-28",2365,2365,2280,2360,201252],["2026-05-27",2410,2450,2320,2365,176352],["2026-05-26",2535,2560,2430,2450,99463],["2026-05-22",2455,2530,2445,2530,62521]],
+  weekly:{ first:"2023-06-12", last:"2026-06-15", n:159,
+    closes:[3380,3080,3180,3250,3280,3090,2895,2820,2935,2990,2850,2935,2800,2800,2740,2560,2515,2500,2365,2270,2340,2275,2440,2650,2615,2595,2610,2570,2545,2755,2775,2805,2855,2875,2995,3090,3055,3140,3150,3040,3115,3035,2915,2885,2755,2830,2970,2940,2980,2980,2830,2865,3010,2990,3270,3220,3355,3265,3300,2970,2985,2990,2990,2965,3030,3080,3065,3135,3010,3015,3000,3010,3185,3050,3000,2980,2995,2970,3015,3015,2995,3015,3030,3000,3045,3000,3010,3005,3045,3005,3000,3015,3025,2995,3010,3000,3060,3060,3100,3125,3010,3150,3175,3150,3160,3315,3430,3950,3500,3340,3090,3040,2960,2950,2925,2845,2945,2975,2985,2865,2875,2860,2810,2910,2905,2710,2680,2555,2520,2555,2515,2505,2340,2465,2905,3500,3595,3155,3020,3010,3080,3115,2830,2750,2900,2805,2605,2570,2655,2635,2760,2635,2440,2530,2220,2140,2160,2175,2175] }
+};
+</script>
+<!--DATA_END-->
+
+<script>
+const S = window.STOCK;
+const fmt = n => n == null ? "—" : n.toLocaleString("ko-KR");
+const COLOR = "#ff7f0e";
+
+document.title = `${S.name} (${S.code}) 상세`;
+document.getElementById("title").innerHTML = `${S.name} <span class="code">${S.code} · ${S.market}</span>`;
+const diff = S.price - S.sd.prevC, pct = (diff / S.sd.prevC * 100).toFixed(2);
+const cls = diff >= 0 ? "up" : "down", arrow = diff > 0 ? "▲" : diff < 0 ? "▼" : "−";
+document.getElementById("price").textContent = fmt(S.price) + "원";
+document.getElementById("chg").innerHTML = `<span class="${cls}">${arrow} ${fmt(Math.abs(diff))} (${pct}%)</span> <span style="color:var(--sub);font-weight:normal;font-size:12px">전일 대비</span>`;
+document.getElementById("updated").textContent = "최종 업데이트: " + S.updated + " · 출처: Yahoo Finance · 매일 8시·11시·16시 자동 갱신";
+
+// 탭
+document.querySelectorAll(".tabs button").forEach(b => b.onclick = () => {
+  document.querySelectorAll(".tabs button").forEach(x => x.classList.remove("on"));
+  document.querySelectorAll("section").forEach(x => x.classList.remove("on"));
+  b.classList.add("on");
+  document.getElementById("tab-" + b.dataset.t).classList.add("on");
+});
+
+// ── 종합정보
+const mcapF = S.sd.mcap == null ? "—" : S.sd.mcap >= 1e12 ? (S.sd.mcap/1e12).toFixed(1).replace(/\B(?=(\d{3})+(?!\d))/g,",") + "조원" : Math.round(S.sd.mcap/1e8).toLocaleString("ko-KR") + "억원";
+const recMap = {strong_buy:"적극매수", buy:"매수", hold:"중립", underperform:"비중축소", sell:"매도", none:"—"};
+const kv = [
+  ["시가총액", mcapF], ["상장주식수", fmt(S.sd.shares) + "주"],
+  ["52주 최고", fmt(S.h52) + "원"], ["52주 최저", fmt(S.l52) + "원"],
+  ["배당수익률", S.sd.divY == null ? "—" : (S.sd.divY*100).toFixed(2) + "%"], ["베타(1년)", S.sd.beta == null ? "—" : S.sd.beta],
+  ["ROE", S.sd.roe == null ? "—" : (S.sd.roe*100).toFixed(1) + "%"], ["EPS(" + S.fin.years[3] + ")", fmt(S.fin.eps[3]) + "원"],
+  ["평균 거래량(3개월)", fmt(S.sd.avgVol)], ["애널리스트 목표가", S.sd.tgt == null ? "—" : fmt(Math.round(S.sd.tgt)) + "원"],
+  ["투자의견", recMap[S.sd.rec] || "—"], ["섹터 / 업종", (S.sd.sector||"—") + " / " + (S.sd.industry||"—")],
+  ["홈페이지", S.sd.web ? `<a href="${S.sd.web}" target="_blank">${S.sd.web.replace("https://","")}</a>` : "—"], ["네이버 금융", `<a href="https://finance.naver.com/item/main.naver?code=${S.code}" target="_blank">바로가기 →</a>`]
+];
+document.getElementById("kvGrid").innerHTML = kv.map(([k,v]) => `<div class="kv"><span class="k">${k}</span><span>${v}</span></div>`).join("");
+
+// 3년 주간 차트
+const wkDates = (() => { const a=[]; const d0=new Date(S.weekly.first+"T00:00:00");
+  for (let i=0;i<S.weekly.n-1;i++) a.push(new Date(d0.getTime()+i*7*86400000).toISOString().slice(0,10));
+  a.push(S.weekly.last); return a; })();
+const wkFrom = Math.max(0, wkDates.findIndex(d => d >= "2025-06-01"));
+new Chart(document.getElementById("wkChart"), { type:"line",
+  data:{ labels:wkDates.slice(wkFrom), datasets:[{ data:S.weekly.closes.slice(wkFrom), borderColor:COLOR, borderWidth:1.8, pointRadius:0, tension:.15, spanGaps:true, fill:true, backgroundColor:COLOR+"18" }] },
+  options:{ responsive:true, plugins:{legend:{display:false}}, interaction:{mode:"index",intersect:false},
+    scales:{ x:{ticks:{maxTicksLimit:10}}, y:{ticks:{callback:v=>v.toLocaleString("ko-KR")}} } } });
+
+// ── 시세
+document.getElementById("strip").innerHTML = [
+  ["시가", fmt(S.sd.open)], ["고가", fmt(S.sd.dayH)], ["저가", fmt(S.sd.dayL)], ["종가", fmt(S.price)], ["거래량", fmt(S.tbl[0][5])]
+].map(([k,v]) => `<div>${k}<b>${v}</b></div>`).join("");
+const dDates = S.dailyDates.map(d => "20"+d.slice(0,2)+"-"+d.slice(2,4)+"-"+d.slice(4,6));
+new Chart(document.getElementById("dChart"), { type:"line",
+  data:{ labels:dDates, datasets:[{ data:S.dailyCloses, borderColor:COLOR, borderWidth:1.8, pointRadius:0, tension:.1, spanGaps:true, fill:true, backgroundColor:COLOR+"18" }] },
+  options:{ responsive:true, plugins:{legend:{display:false}}, interaction:{mode:"index",intersect:false},
+    scales:{ x:{ticks:{maxTicksLimit:8}}, y:{ticks:{callback:v=>v.toLocaleString("ko-KR")}} } } });
+document.getElementById("tblBody").innerHTML = S.tbl.map((r,i) => {
+  const prev = i < S.tbl.length-1 ? S.tbl[i+1][4] : null;
+  const d = prev == null ? null : r[4]-prev;
+  const c = d == null ? "" : d > 0 ? "up" : d < 0 ? "down" : "";
+  const a = d == null ? "—" : (d > 0 ? "▲" : d < 0 ? "▼" : "−") + fmt(Math.abs(d));
+  return `<tr><td>${r[0]}</td><td>${fmt(r[1])}</td><td>${fmt(r[2])}</td><td>${fmt(r[3])}</td><td><b>${fmt(r[4])}</b></td><td class="${c}">${a}</td><td>${fmt(r[5])}</td></tr>`;
+}).join("");
+
+// ── 재무정보
+new Chart(document.getElementById("finChart"), { type:"bar",
+  data:{ labels:S.fin.years, datasets:[
+    { label:"매출액", data:S.fin.rev, backgroundColor:"#1f77b4" },
+    { label:"영업이익", data:S.fin.op, backgroundColor:"#2ca02c" },
+    { label:"순이익", data:S.fin.ni, backgroundColor:"#ff7f0e" } ] },
+  options:{ responsive:true, plugins:{legend:{position:"top"}},
+    scales:{ y:{ ticks:{ callback:v => Math.abs(v) >= 10000 ? (v/10000).toLocaleString("ko-KR")+"조" : v.toLocaleString("ko-KR")+"억" } } } } });
+S.fin.years.forEach((y,i) => document.getElementById("y"+i).textContent = y);
+document.getElementById("finBody").innerHTML = [
+  ["매출액(억원)", S.fin.rev], ["영업이익(억원)", S.fin.op], ["순이익(억원)", S.fin.ni], ["EPS(원)", S.fin.eps]
+].map(([k,arr]) => `<tr><td>${k}</td>${arr.map(v=>`<td${v<0?' class="down"':''}>${fmt(v)}</td>`).join("")}</tr>`).join("");
+
+// ── 뉴스 / 공시 링크
+document.getElementById("newsLinks").innerHTML = [
+  [`https://finance.naver.com/item/news.naver?code=${S.code}`, "네이버 금융 — 종목 뉴스·공시", "가장 풍부한 한국어 종목 뉴스"],
+  [`https://finance.yahoo.com/quote/${S.sym}/news`, "야후 파이낸스 — 뉴스", "영문 글로벌 뉴스"],
+  [`https://news.google.com/search?q=${encodeURIComponent(S.name + " 주가")}&hl=ko&gl=KR`, "구글 뉴스 — '" + S.name + " 주가' 검색", "여러 언론사 종합"]
+].map(([u,t,d]) => `<a href="${u}" target="_blank">${t} →<div class="d">${d}</div></a>`).join("");
+document.getElementById("discLinks").innerHTML = [
+  [`https://dart.fss.or.kr/dsab007/main.do?option=corp&textCrpNm=${encodeURIComponent(S.name)}`, "DART 전자공시 — " + S.name + " 공시검색", "금융감독원 공식 공시 (사업보고서·주요사항보고 등)"],
+  [`https://kind.krx.co.kr/common/searchcorpname.do?method=searchCorpNameMain&searchCodeType=char&searchCorpName=${encodeURIComponent(S.name)}`, "KIND(거래소 공시) — " + S.name, "한국거래소 상장공시시스템"],
+  [`https://finance.naver.com/item/news.naver?code=${S.code}`, "네이버 금융 — 뉴스·공시 탭", "공시 요약을 한눈에"]
+].map(([u,t,d]) => `<a href="${u}" target="_blank">${t} →<div class="d">${d}</div></a>`).join("");
+</script>
+</body>
+</html>
